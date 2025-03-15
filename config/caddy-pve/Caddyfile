@@ -1,0 +1,23 @@
+{$CADDY_CERT_DOMAIN} {
+    reverse_proxy * {
+        to {$CADDY_UPSTREAM1}
+        to {$CADDY_UPSTREAM2}
+        to {$CADDY_UPSTREAM3}
+
+        lb_policy ip_hash     # Makes backend sticky based on client ip
+        lb_try_duration 10s
+        lb_try_interval 250ms
+
+        health_uri /          # Backend health check path
+        # health_port 80      # Default same as backend port
+        health_interval 30s
+        health_timeout 5s
+        health_status 200
+
+        transport http {
+            tls
+	        tls_insecure_skip_verify
+	        read_buffer 8192
+        }
+    }
+}

@@ -1,0 +1,70 @@
+services:
+
+  ts-pve:
+    image: tailscale/tailscale
+    container_name: ts-pve
+    hostname: ${TS_PVE_HOSTNAME}
+    environment:
+      - TS_STATE_DIR=/var/lib/tailscale
+      - TS_AUTH_KEY=${TS_PVE_AUTH_KEY}
+    volumes:
+      - /dev/net/tun:/dev/net/tun
+      - ${PWD}/volumes/ts-pve/lib:/var/lib
+      # tailscaled.sock shared with caddy
+      - ${PWD}/volumes/ts-pve/run:/tmp
+    cap_add:
+      - NET_ADMIN
+    restart: unless-stopped
+
+  caddy-pve:
+    image: caddy:latest
+    container_name: caddy-pve
+    depends_on:
+      - ts-pve
+    environment:
+      - CADDY_CERT_DOMAIN=${CADDY_PVE_CERT_DOMAIN}
+      - CADDY_UPSTREAM1=${CADDY_PVE_UPSTREAM1}
+      - CADDY_UPSTREAM2=${CADDY_PVE_UPSTREAM2}
+      - CADDY_UPSTREAM3=${CADDY_PVE_UPSTREAM3}
+    volumes:
+      - ${PWD}/config/caddy-pve/Caddyfile:/etc/caddy/Caddyfile
+      - ${PWD}/volumes/caddy-pve/data:/data
+      - ${PWD}/volumes/caddy-pve/config:/config
+      # tailscaled.sock shared with caddy
+      - ${PWD}/volumes/ts-pve/run:/var/run/tailscale
+    network_mode: service:ts-pve
+    restart: unless-stopped
+
+  ts-fw:
+    image: tailscale/tailscale
+    container_name: ts-fw
+    hostname: ${TS_FW_HOSTNAME}
+    environment:
+      - TS_STATE_DIR=/var/lib/tailscale
+      - TS_AUTH_KEY=${TS_FW_AUTH_KEY}
+    volumes:
+      - /dev/net/tun:/dev/net/tun
+      - ${PWD}/volumes/ts-fw/lib:/var/lib
+      # tailscaled.sock shared with caddy
+      - ${PWD}/volumes/ts-fw/run:/tmp
+    cap_add:
+      - NET_ADMIN
+    restart: unless-stopped
+
+  caddy-fw:
+    image: caddy:latest
+    container_name: caddy-fw
+    depends_on:
+      - ts-fw
+    environment:
+      - CADDY_CERT_DOMAIN=${CADDY_FW_CERT_DOMAIN}
+      - CADDY_UPSTREAM=${CADDY_FW_UPSTREAM}
+    volumes:
+      - ${PWD}/config/caddy-fw/Caddyfile:/etc/caddy/Caddyfile
+      - ${PWD}/volumes/caddy-fw/data:/data
+      - ${PWD}/volumes/caddy-fw/config:/config
+      # tailscaled.sock shared with caddy
+      - ${PWD}/volumes/ts-fw/run:/var/run/tailscale
+    network_mode: service:ts-fw
+    restart: unless-stopped
+
