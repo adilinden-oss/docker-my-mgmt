@@ -68,3 +68,35 @@ services:
     network_mode: service:ts-fw
     restart: unless-stopped
 
+  ts-pbs:
+    image: tailscale/tailscale
+    container_name: ts-pbs
+    hostname: ${TS_PBS_HOSTNAME}
+    environment:
+      - TS_STATE_DIR=/var/lib/tailscale
+      - TS_AUTH_KEY=${TS_PBS_AUTH_KEY}
+    volumes:
+      - /dev/net/tun:/dev/net/tun
+      - ${PWD}/volumes/ts-pbs/lib:/var/lib
+      # tailscaled.sock shared with caddy
+      - ${PWD}/volumes/ts-pbs/run:/tmp
+    cap_add:
+      - NET_ADMIN
+    restart: unless-stopped
+
+  caddy-pbs:
+    image: caddy:latest
+    container_name: caddy-pbs
+    depends_on:
+      - ts-pbs
+    environment:
+      - CADDY_CERT_DOMAIN=${CADDY_PBS_CERT_DOMAIN}
+      - CADDY_UPSTREAM=${CADDY_PBS_UPSTREAM}
+    volumes:
+      - ${PWD}/config/caddy-pbs/Caddyfile:/etc/caddy/Caddyfile
+      - ${PWD}/volumes/caddy-pbs/data:/data
+      - ${PWD}/volumes/caddy-pbs/config:/config
+      # tailscaled.sock shared with caddy
+      - ${PWD}/volumes/ts-pbs/run:/var/run/tailscale
+    network_mode: service:ts-pbs
+    restart: unless-stopped

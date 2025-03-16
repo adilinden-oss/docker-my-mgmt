@@ -81,7 +81,7 @@ Quick start
 
 Copy `example.env` to `.env` and adjust as needed.
 
-### Proxmox
+### Proxmox VE
 
 Create this `docker-compose.yml`
 
@@ -217,6 +217,73 @@ TS_FW_AUTH_KEY=tskey-1234567890
 # Caddy (Firewall)
 CADDY_FW_CERT_DOMAIN=mgmt-fw.my_tailnet_name.ts.net
 CADDY_FW_UPSTREAM=https://192.168.99.1:443
+```
+
+Create `config/caddy-fw/Caddyfile` configuration file
+
+```
+{$CADDY_CERT_DOMAIN} {
+    reverse_proxy {$CADDY_UPSTREAM} {
+        transport http {
+            tls
+            tls_insecure_skip_verify
+            read_buffer 8192
+        }
+    }
+}
+```
+
+### Proxmox Backup Server
+
+Create this `docker-compose.yml`
+
+```
+services:
+
+  ts-pbs:
+    image: tailscale/tailscale
+    container_name: ts-pbs
+    hostname: ${TS_PBS_HOSTNAME}
+    environment:
+      - TS_STATE_DIR=/var/lib/tailscale
+      - TS_AUTH_KEY=${TS_PBS_AUTH_KEY}
+    volumes:
+      - /dev/net/tun:/dev/net/tun
+      - ${PWD}/volumes/ts-pbs/lib:/var/lib
+      # tailscaled.sock shared with caddy
+      - ${PWD}/volumes/ts-pbs/run:/tmp
+    cap_add:
+      - NET_ADMIN
+    restart: unless-stopped
+
+  caddy-pbs:
+    image: caddy:latest
+    container_name: caddy-pbs
+    depends_on:
+      - ts-pbs
+    environment:
+      - CADDY_CERT_DOMAIN=${CADDY_PBS_CERT_DOMAIN}
+      - CADDY_UPSTREAM=${CADDY_PBS_UPSTREAM}
+    volumes:
+      - ${PWD}/config/caddy-pbs/Caddyfile:/etc/caddy/Caddyfile
+      - ${PWD}/volumes/caddy-pbs/data:/data
+      - ${PWD}/volumes/caddy-pbs/config:/config
+      # tailscaled.sock shared with caddy
+      - ${PWD}/volumes/ts-pbs/run:/var/run/tailscale
+    network_mode: service:ts-pbs
+    restart: unless-stopped
+```
+
+This is an example `.env` file for this service
+
+```
+# Tailscale (Proxmox Backup Server)
+TS_PBS_HOSTNAME=mgmt-fw
+TS_PBS_AUTH_KEY=tskey-1234567890
+
+# Caddy (Proxmox Backup Server)
+CADDY_PBS_CERT_DOMAIN=mgmt-fw.my_tailnet_name.ts.net
+CADDY_PBS_UPSTREAM=https://192.168.99.75:443
 ```
 
 Create `config/caddy-fw/Caddyfile` configuration file
